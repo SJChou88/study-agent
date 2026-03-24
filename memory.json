@@ -1,0 +1,81 @@
+{
+  "goal": "Learn to build GenAI applications using the Claude API and Claude Code",
+  "timeframe": 4,
+  "hours_per_week": 10.0,
+  "start_date": "2026-03-23",
+  "original_scope": {
+    "1": "Get plan generation working, focus on prompt design and structured output",
+    "2": "Add persistence and logging, learn state management across sessions",
+    "3": "Add replanning, start eval work — is the new plan better than the original?",
+    "4": "Clean up, document, write the GitHub post"
+  },
+  "current_plan": {
+    "1": [
+      "PROJECT: Build a multi-turn CLI research assistant that maintains conversation context, streams responses, and persists session history to SQLite",
+      "Implement streaming response handler using anthropic.messages.stream() with live token output to stdout",
+      "Design a Message object schema and SQLite persistence layer that stores full conversation history with timestamps and token usage",
+      "Build conversation context manager that retrieves and injects prior turns respecting the 200k context window limits",
+      "Add a --resume flag that reloads any prior session by ID and continues the conversation from where it left off",
+      "Instrument token usage tracking per turn and print a running cost estimate using Claude 3.5 Sonnet pricing"
+    ],
+    "2": [
+      "PROJECT: Build an agentic document intelligence pipeline that uses tool use to extract structured data from PDFs, cross-reference against a database, and produce a validated JSON report",
+      "Define a custom tool schema for document parsing operations: extract_table, extract_entities, query_database, and validate_schema",
+      "Implement the tool execution loop with proper ToolUseBlock and ToolResultBlock handling including error propagation back to the model",
+      "Write a PDF-to-vision pipeline using base64-encoded page images passed to Claude's vision input for scanned document support",
+      "Build the cross-reference tool that queries a local DuckDB database and returns structured results the model can reason over",
+      "Add an agentic retry layer: if Claude's output fails JSON schema validation, automatically re-prompt with the validation errors until it passes or hits 3 attempts"
+    ],
+    "3": [
+      "PROJECT: Deploy a production-grade FastAPI service wrapping Claude that supports parallel async requests, prompt caching, and a configurable system prompt library with A/B testing instrumentation",
+      "Build async FastAPI endpoints using anthropic.AsyncAnthropic with asyncio.gather for concurrent multi-request handling and benchmark throughput",
+      "Implement prompt caching using cache_control breakpoints on system prompts and large static context blocks, measure cache hit rates via API response headers",
+      "Create a YAML-defined system prompt library with named variants and wire up a request-level A/B assignment that logs variant, latency, and output tokens to Postgres",
+      "Add a middleware layer for request authentication, rate limiting per API key, and structured JSON logging compatible with a log aggregator",
+      "Write a /eval endpoint that accepts a test dataset, runs all prompt variants in parallel, scores outputs with a Claude-as-judge call, and returns a comparison report"
+    ],
+    "4": [
+      "PROJECT: Build and deploy a Claude Code-powered autonomous code review agent that clones a GitHub repo, performs multi-file analysis using extended thinking, and posts actionable PR comments via the GitHub API",
+      "Use Claude Code SDK to orchestrate a headless agent session that accepts a GitHub PR URL, clones the diff, and maps changed files into a structured analysis plan",
+      "Enable extended thinking (budget_tokens: 8000) for architectural reasoning tasks where the agent must trace data flow across multiple files before forming a judgment",
+      "Implement a multi-agent subagent pattern: a coordinator Claude instance decomposes the PR into review domains (security, performance, correctness) and spawns parallel specialist agents for each",
+      "Build a GitHub API integration that deduplicates comments, maps findings to specific line numbers using the pull_request_review API, and posts a summary review with severity-weighted scoring",
+      "Add a self-critique loop where the agent reviews its own draft comments with a second Claude call, filters out low-confidence findings below a threshold, and logs precision metrics for future calibration"
+    ]
+  },
+  "plan_history": [
+    {},
+    {
+      "1": [
+        "Introduction to Generative AI concepts and Large Language Models (LLMs) \u2014 read overview articles and watch intro videos (2h)",
+        "Create an Anthropic account, explore the Claude API documentation, and understand API key setup and authentication (2h)",
+        "Study Claude's core API endpoints: messages, completions, and tokens \u2014 run your first 'Hello World' API call using curl or Postman (2h)",
+        "Learn Python basics for API integration: requests library, environment variables with dotenv, and error handling (2h)",
+        "Build a simple CLI chatbot using the Claude API \u2014 single-turn and multi-turn conversation with message history (2h)"
+      ],
+      "2": [
+        "Deep dive into prompt engineering: system prompts, user/assistant roles, and best practices for Claude (2h)",
+        "Explore advanced prompting techniques: chain-of-thought, few-shot examples, XML tags for structured input, and temperature/top-p parameters (2h)",
+        "Learn Claude's tool use (function calling) feature \u2014 define tools, handle tool calls, and return tool results in a conversation loop (2h)",
+        "Build a practical tool-use application: a weather assistant or calculator bot that uses external functions via Claude's tool use API (2h)",
+        "Introduction to Claude Code \u2014 install the CLI, understand its architecture, and run your first Claude Code session in a project directory (2h)"
+      ],
+      "3": [
+        "Explore Claude Code workflows: slash commands, file context, code generation, explanation, and debugging features (2h)",
+        "Use Claude Code to scaffold a small web application \u2014 practice iterative development, ask Claude to write tests, and refactor code (2h)",
+        "Build a Retrieval-Augmented Generation (RAG) pipeline: chunk documents, generate embeddings, store in a vector DB (e.g., ChromaDB), and query with Claude (2h)",
+        "Add streaming responses to your Claude API app using the streaming API \u2014 improve UX with real-time token output in a terminal or web UI (2h)",
+        "Build a document Q&A application combining RAG + streaming + tool use \u2014 end-to-end mini project integrating Week 1\u20133 skills (2h)"
+      ],
+      "4": [
+        "Learn best practices for production Claude apps: rate limiting, retry logic, cost estimation, token counting, and logging (2h)",
+        "Explore Anthropic's safety guidelines, responsible AI use, and how to implement content moderation in your applications (2h)",
+        "Build a full-stack GenAI web app: use FastAPI or Flask backend with Claude API + a simple React or HTML/JS frontend (2h)",
+        "Use Claude Code to enhance and debug your full-stack app \u2014 practice agentic coding workflows, automated refactoring, and writing documentation (2h)",
+        "Review all projects, deploy your web app (e.g., to Render or Railway), write a README, and outline next steps for advanced topics like agents and multi-modal Claude (2h)"
+      ]
+    }
+  ],
+  "progress_logs": [],
+  "eval_scores": []
+}
