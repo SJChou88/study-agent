@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 
 from dotenv import load_dotenv
 import anthropic
@@ -112,7 +112,67 @@ def log_progress(entry: str) -> None:
     uses the Claude API to extract structured insights (topics covered,
     hours spent, blockers) and attach them to the log entry.
     """
-    pass
+    if not entry.strip():
+        print("Entry is blank — nothing logged.")
+        return
+
+    memory = storage.load_memory()
+
+    if not memory.get("current_plan"):
+        print("No current plan found. Run `python agent.py plan` first.")
+        return
+
+    plan_summary = json.dumps(memory["current_plan"], indent=2)
+
+    user_message = (
+        f"Study plan:\n{plan_summary}\n\n"
+        f"Progress entry:\n{entry}\n\n"
+        f"Return ONLY a JSON object with these fields:\n"
+        f"  topics_covered: list of strings\n"
+        f"  hours_spent: float or null\n"
+        f"  blockers: list of strings\n"
+        f"  week_reference: string (e.g. \"Week 2\") or null\n"
+        f"  sentiment: one of \"on_track\", \"ahead\", \"behind\", \"blocked\"\n"
+        f"No extra text — just valid JSON."
+    )
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=512,
+        system=(
+            "You are a learning coach analyzing a student's progress log. "
+            "Extract structured insights from the entry relative to the provided study plan. "
+            "Return ONLY a valid JSON object — no explanation, no markdown fences."
+        ),
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    insights_text = response.content[0].text.strip()
+
+    if insights_text.startswith("```"):
+        lines = insights_text.splitlines()
+        insights_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+
+    insights = json.loads(insights_text)
+
+    log_entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "entry": entry,
+        "insights": insights,
+    }
+    memory["progress_logs"].append(log_entry)
+    storage.save_memory(memory)
+
+    print("\n=== Progress Logged ===")
+    print(f"Topics covered: {', '.join(insights.get('topics_covered', [])) or 'none'}")
+    if insights.get("hours_spent") is not None:
+        print(f"Hours spent:    {insights['hours_spent']}")
+    if insights.get("week_reference"):
+        print(f"Week reference: {insights['week_reference']}")
+    if insights.get("blockers"):
+        print(f"Blockers:       {', '.join(insights['blockers'])}")
+    print(f"Sentiment:      {insights.get('sentiment', 'unknown')}")
+    print(f"Logged at:      {log_entry['timestamp']}")
 
 
 def replan() -> None:
@@ -128,9 +188,20 @@ def replan() -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "plan":
+    command = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if command == "plan":
         generate_plan()
+    elif command == "log":
+        entry = " ".join(sys.argv[2:]).strip()
+        if not entry:
+            entry = input("Progress entry: ").strip()
+        log_progress(entry)
+    elif command == "replan":
+        replan()
     else:
         print("Usage: python agent.py <command>")
         print("Commands:")
-        print("  plan    Generate a new learning plan")
+        print("  plan          Generate a new learning plan")
+        print("  log <entry>   Log a progress update")
+        print("  replan        Revise the plan based on progress")
