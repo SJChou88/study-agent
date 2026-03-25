@@ -153,7 +153,11 @@ def log_progress(entry: str) -> None:
         lines = insights_text.splitlines()
         insights_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
 
-    insights = json.loads(insights_text)
+    try:
+        insights = json.loads(insights_text)
+    except json.JSONDecodeError:
+        print("Warning: could not parse structured insights. Storing raw entry only.")
+        insights = {}
 
     log_entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -184,7 +188,122 @@ def replan() -> None:
     archives the old plan in memory['plan_history'], and records an
     evaluation score in memory['eval_scores'].
     """
-    pass
+    memory = storage.load_memory()
+
+    if not memory.get("current_plan"):
+        print("No current plan found. Run `python agent.py plan` first.")
+        return
+
+    if not memory.get("progress_logs"):
+        print("No progress logs found. Run `python agent.py log` to log progress first.")
+        return
+
+    goal = memory["goal"]
+    timeframe = memory["timeframe"]
+    hours_per_week = memory["hours_per_week"]
+    start_date = memory["start_date"]
+    current_plan = memory["current_plan"]
+    progress_logs = memory["progress_logs"]
+
+    plan_summary = json.dumps(current_plan, indent=2)
+    logs_summary = json.dumps(
+        [{"entry": l["entry"], "insights": l.get("insights", {})} for l in progress_logs],
+        indent=2,
+    )
+
+    user_message = (
+        f"Original goal: {goal}\n"
+        f"Timeframe: {timeframe} weeks | {hours_per_week} hours/week\n"
+        f"Start date: {start_date}\n\n"
+        f"Current plan:\n{plan_summary}\n\n"
+        f"Progress logs:\n{logs_summary}\n\n"
+        f"Return ONLY a JSON object with two top-level keys:\n"
+        f'1. "revised_plan": a plan object in the same schema as the current plan '
+        f'(string week keys, list of strings per week, first item starts with "PROJECT:"). '
+        f"Include only the remaining weeks based on progress so far — renumber from 1 if needed.\n"
+        f'2. "eval": an object with:\n'
+        f"   - weeks_completed: int\n"
+        f"   - sentiment_summary: string summarizing overall progress sentiment\n"
+        f"   - notes: string with key observations about progress\n"
+        f"No extra text — just valid JSON."
+    )
+
+    print("\nReplanning based on your progress...")
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        system=(
+            "You are an expert learning coach reviewing a student's progress against their study plan. "
+            "Evaluate the progress logs honestly and produce a revised plan that accounts for what has "
+            "been completed, any blockers, and the remaining time. The revised plan should cover only "
+            "the weeks not yet completed. Maintain the same project-based structure with concrete "
+            "outcomes starting with 'PROJECT:'. Return ONLY a valid JSON object — no explanation, "
+            "no markdown fences."
+        ),
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    response_text = response.content[0].text.strip()
+
+    # Strip markdown code fences if the model included them
+    if response_text.startswith("```"):
+        lines = response_text.splitlines()
+        response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+
+    try:
+        result = json.loads(response_text)
+    except json.JSONDecodeError:
+        print("Warning: could not parse response. Replan aborted.")
+        return
+
+    revised_plan = result.get("revised_plan", {})
+    eval_data = result.get("eval", {})
+
+    # Archive current plan before overwriting
+    memory["plan_history"].append(current_plan)
+    memory["current_plan"] = revised_plan
+
+    # Append eval score
+    memory["eval_scores"].append({
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "weeks_completed": eval_data.get("weeks_completed", 0),
+        "sentiment_summary": eval_data.get("sentiment_summary", ""),
+        "notes": eval_data.get("notes", ""),
+    })
+
+    storage.save_memory(memory)
+
+    # Print readable diff
+    old_weeks = set(current_plan.keys())
+    new_weeks = set(revised_plan.keys())
+
+    print(f"\n=== Replan: {goal} ===")
+    print(f"Weeks completed: {eval_data.get('weeks_completed', 0)} / {timeframe}")
+    print(f"Sentiment:       {eval_data.get('sentiment_summary', 'unknown')}")
+    if eval_data.get("notes"):
+        print(f"Notes:           {eval_data['notes']}")
+
+    print("\n--- Plan Diff ---")
+    all_weeks = sorted(old_weeks | new_weeks, key=lambda x: int(x))
+    for week in all_weeks:
+        old_tasks = current_plan.get(week, [])
+        new_tasks = revised_plan.get(week, [])
+        if week not in new_weeks:
+            print(f"Week {week}: [removed]")
+        elif week not in old_weeks:
+            print(f"Week {week}: [new]")
+            for task in new_tasks:
+                print(f"  + {task}")
+        elif old_tasks == new_tasks:
+            print(f"Week {week}: unchanged")
+        else:
+            print(f"Week {week}: changed")
+            old_project = next((t for t in old_tasks if t.startswith("PROJECT:")), old_tasks[0])
+            new_project = next((t for t in new_tasks if t.startswith("PROJECT:")), new_tasks[0])
+            print(f"  was: {old_project}")
+            print(f"  now: {new_project}")
+    print()
 
 
 if __name__ == "__main__":
