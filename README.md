@@ -18,7 +18,7 @@ I had a month to deliberately upskill in building GenAI applications and wanted 
    ANTHROPIC_API_KEY=your-key-here
    ```
 
-## Usage
+## Study Agent
 
 **Generate a plan:**
 ```bash
@@ -26,23 +26,41 @@ python agent.py plan
 ```
 You'll be prompted for your goal, timeframe (weeks), and hours per week. The agent returns a week-by-week plan where each week is anchored to a specific project outcome.
 
-**Log progress** *(coming soon)*:
+**Log progress:**
 ```bash
 python agent.py log "Finished building the pipeline, got stuck on async batching"
 ```
+Accepts a free-text update and extracts structured insights (topics covered, hours spent, blockers, sentiment) via Claude.
 
-**Replan** *(coming soon)*:
+**Replan:**
 ```bash
 python agent.py replan
 ```
-Evaluates your logged progress against the original plan and generates a revised schedule.
+Evaluates your logged progress against the original plan and generates a revised schedule covering only the remaining weeks. Archives the old plan and records an eval score.
+
+## Research Assistant
+
+A streaming multi-turn CLI for asking questions about GenAI and LLM concepts. Persists every conversation to SQLite so you can resume or review past sessions.
+
+```bash
+python research-assistant/main.py
+```
+
+**Commands:**
+- `/history` — list all past sessions with their first message
+- `/history <session_id>` — print the full conversation for a session
+- `/quit` — exit
 
 ## Project Structure
 
 ```
 study-agent/
-├── .env              # API key (not committed)
-├── memory.json       # Persistent state: goal, plan, logs (not committed)
-├── agent.py          # Core agent logic
-└── storage.py        # Load/save memory helpers
+├── .env                          # API key (not committed)
+├── memory.json                   # Persistent state: goal, plan, logs
+├── agent.py                      # Study agent: plan, log, replan
+├── storage.py                    # Load/save memory helpers
+└── research-assistant/
+    ├── main.py                   # Streaming CLI research assistant
+    ├── db.py                     # SQLite helpers for conversation history
+    └── conversations.db          # Session storage (not committed)
 ```
